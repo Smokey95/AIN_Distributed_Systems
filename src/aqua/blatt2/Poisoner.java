@@ -3,6 +3,7 @@ package aqua.blatt2;
 import java.net.InetSocketAddress;
 
 import javax.swing.JOptionPane;
+import javax.swing.ImageIcon;
 
 import messaging.Endpoint;
 import aqua.blatt1.common.Properties;
@@ -32,7 +33,13 @@ public class Poisoner {
 	}
 
 	public static void main(String[] args) {
-		JOptionPane.showMessageDialog(null, "Press OK button to poison server.");
+		// Get Image in resources folder
+		JOptionPane.showMessageDialog(null, 
+																	"Press OK button to poison server.",
+																	"Poison Server",
+																	JOptionPane.INFORMATION_MESSAGE, 
+																	new javax.swing.ImageIcon(Poisoner.class.getResource("/aqua/blatt2/resources/poison.png")));
 		new Poisoner().sendPoison();
+
 	}
 }
