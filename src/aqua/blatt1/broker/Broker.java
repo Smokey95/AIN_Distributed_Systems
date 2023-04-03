@@ -36,10 +36,13 @@ public class Broker {
   
   int curr_client_count = 0;
   
+  private static int thread_pool_size = 10;
+  
   private ReentrantReadWriteLock lock;
 
-  private static ExecutorService executor = Executors.newCachedThreadPool();
+  private static ExecutorService executor = Executors.newFixedThreadPool(thread_pool_size);
   
+  // Flag to stop the broker (needs to be volatile, see script "Nebenläufigkeit 3.1")
   private static volatile boolean stopRequested = false;
 
   
@@ -50,6 +53,7 @@ public class Broker {
   public Broker() {
     this.lock = new ReentrantReadWriteLock();
     this.endpoint = new Endpoint(4711);
+    
     // Create a new ClientCollection to store the clients
     this.cc_list = new ClientCollection<>();
   }
@@ -165,11 +169,11 @@ public class Broker {
         break;
       }
       
-      // Handle the message in a separatedd BrokerTask thread
-      //new Thread(new BrokerTask(message)).start();
+      // Handle the message in a separated BrokerTask thread
       executor.execute(new BrokerTask(message));
     }
     
+    // Executor-Service has to be shutdown to terminate the program
     System.out.println("Broker stopped");
     executor.shutdown();
   }
