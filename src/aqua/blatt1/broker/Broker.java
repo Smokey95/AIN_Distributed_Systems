@@ -21,6 +21,7 @@ import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
+import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt2.PoisonPill;
 import aqua.blatt2.Poisoner;
 
@@ -116,6 +117,8 @@ public class Broker {
         System.out.println("Registered client " + curr_client_count);    
         curr_client_count++;
       } finally {
+        if(curr_client_count == 1)
+          endpoint.send(currentMsg.getSender(), new Token());
         lock.writeLock().unlock();
       }
     }

@@ -11,6 +11,7 @@ import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
+import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
 import aqua.blatt2.PoisonPill;
 
@@ -47,6 +48,10 @@ public class ClientCommunicator {
 				endpoint.send(tankModel.getRightTank(), new HandoffRequest(fish));
 		}
 		
+		public synchronized void sendToken(InetSocketAddress neighbor) {
+			endpoint.send(neighbor, new Token());
+		}
+		
 	}
 
 	
@@ -76,6 +81,9 @@ public class ClientCommunicator {
 					else if (neighborUpdate.getDirection() == Direction.RIGHT)
 						tankModel.setRightTank(neighborUpdate.getNeighbor());
 				}
+				
+				if (msg.getPayload() instanceof Token)
+					tankModel.receiveToken();
 				
 				// If the message is a PoisonPill, stop the receiver
 				if (msg.getPayload() instanceof PoisonPill)
