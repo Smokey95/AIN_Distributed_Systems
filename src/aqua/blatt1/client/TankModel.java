@@ -1,5 +1,6 @@
 package aqua.blatt1.client;
 
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Observable;
@@ -22,6 +23,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	protected final Set<FishModel> fishies;
 	protected int fishCounter = 0;
 	protected final ClientCommunicator.ClientForwarder forwarder;
+	protected InetSocketAddress left_neighbor = null;
+	protected InetSocketAddress right_neighbor = null;
 
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
@@ -69,7 +72,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 			fish.update();
 
 			if (fish.hitsEdge())
-				forwarder.handOff(fish);
+				forwarder.handOff(fish, this);
 
 			if (fish.disappears())
 				it.remove();
@@ -103,5 +106,25 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	public synchronized void finish() {
 		forwarder.deregister(id);
 	}
-
+	
+	public synchronized void neighborUpdate(InetSocketAddress left_neighbor, InetSocketAddress right_neighbor) {
+		this.left_neighbor = left_neighbor;
+		this.right_neighbor = right_neighbor;
+	}
+	
+	public synchronized void setLeftTank(InetSocketAddress left_neighbor) {
+		this.left_neighbor = left_neighbor;
+	}
+	
+	public synchronized void setRightTank(InetSocketAddress right_neighbor) {
+		this.right_neighbor = right_neighbor;
+	}
+	
+	public synchronized InetSocketAddress getLeftTank() {
+		return left_neighbor;
+	}
+	
+	public synchronized InetSocketAddress getRightTank() {
+		return right_neighbor;
+	}
 }

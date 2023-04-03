@@ -4,21 +4,25 @@ import java.net.InetSocketAddress;
 
 import messaging.Endpoint;
 import messaging.Message;
+import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
 import aqua.blatt1.common.Properties;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
+import aqua.blatt1.common.msgtypes.NeighborUpdate;
 import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
+	
 	private final Endpoint endpoint;
-
+	
 	public ClientCommunicator() {
 		endpoint = new Endpoint();
 	}
 
+	
 	public class ClientForwarder {
 		private final InetSocketAddress broker;
 
@@ -26,19 +30,26 @@ public class ClientCommunicator {
 			this.broker = new InetSocketAddress(Properties.HOST, Properties.PORT);
 		}
 
-		public void register() {
+		public synchronized void register() {
 			endpoint.send(broker, new RegisterRequest());
 		}
 
-		public void deregister(String id) {
+		public synchronized void deregister(String id) {
 			endpoint.send(broker, new DeregisterRequest(id));
 		}
 
-		public void handOff(FishModel fish) {
-			endpoint.send(broker, new HandoffRequest(fish));
+		public synchronized void handOff(FishModel fish, TankModel tankModel) {
+			Direction direction = fish.getDirection();
+			
+			if (direction == Direction.LEFT)
+				endpoint.send(tankModel.getLeftTank(), new HandoffRequest(fish));
+			else if (direction == Direction.RIGHT)
+				endpoint.send(tankModel.getRightTank(), new HandoffRequest(fish));
 		}
+		
 	}
 
+	
 	public class ClientReceiver extends Thread {
 		private final TankModel tankModel;
 
@@ -57,10 +68,18 @@ public class ClientCommunicator {
 				if (msg.getPayload() instanceof HandoffRequest)
 					tankModel.receiveFish(((HandoffRequest) msg.getPayload()).getFish());
 				
+				if (msg.getPayload() instanceof NeighborUpdate) {
+					NeighborUpdate neighborUpdate = (NeighborUpdate) msg.getPayload();
+					
+					if (neighborUpdate.getDirection() == Direction.LEFT)
+						tankModel.setLeftTank(neighborUpdate.getNeighbor());
+					else if (neighborUpdate.getDirection() == Direction.RIGHT)
+						tankModel.setRightTank(neighborUpdate.getNeighbor());
+				}
+				
 				// If the message is a PoisonPill, stop the receiver
 				if (msg.getPayload() instanceof PoisonPill)
 					break;
-
 			}
 			
 			System.out.println("Receiver stopped.");
