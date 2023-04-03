@@ -10,6 +10,7 @@ import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
+import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
 	private final Endpoint endpoint;
@@ -55,9 +56,15 @@ public class ClientCommunicator {
 
 				if (msg.getPayload() instanceof HandoffRequest)
 					tankModel.receiveFish(((HandoffRequest) msg.getPayload()).getFish());
+				
+				// If the message is a PoisonPill, stop the receiver
+				if (msg.getPayload() instanceof PoisonPill)
+					break;
 
 			}
+			
 			System.out.println("Receiver stopped.");
+			
 		}
 	}
 

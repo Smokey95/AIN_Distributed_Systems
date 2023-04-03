@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
 
@@ -81,16 +82,21 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		notifyObservers();
 	}
 
-	protected void run() {
+	/**
+	 * Runs the tank model. This method is called by the client receiver thread.
+	 * @param cr the client receiver to check for termination
+	 */
+	protected void run(ClientReceiver cr) {
 		forwarder.register();
 
 		try {
-			while (!Thread.currentThread().isInterrupted()) {
+			while (!Thread.currentThread().isInterrupted() && cr.isAlive()) {
 				update();
 				TimeUnit.MILLISECONDS.sleep(10);
 			}
 		} catch (InterruptedException consumed) {
 			// allow method to terminate
+			System.out.println(id + "Terminated");
 		}
 	}
 
