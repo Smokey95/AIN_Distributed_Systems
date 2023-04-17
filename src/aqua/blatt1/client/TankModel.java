@@ -14,6 +14,8 @@ import java.util.TimerTask;
 import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
+import aqua.blatt1.common.msgtypes.SnapshotMarker;
+import aqua.blatt1.common.msgtypes.SnapshotToken;
 
 public class TankModel extends Observable implements Iterable<FishModel> {
 
@@ -30,6 +32,22 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	protected boolean token = false;
 	protected Timer timer = new Timer();
+
+	protected int localSnapshot = 0; // !< current fish count
+	protected boolean isSnapshot = false; // is a snapshot currently running?
+	
+	protected int globalSnapshot = 0; // !< current fish count
+	protected boolean initGlobalSnapshot = false; // !< is a global snapshot currently running?
+	protected SnapshotToken snapshotToken = null; // !< snapshot token
+	
+	enum SnapshotState {
+		IDLE, 	// !< no snapshot running
+		LEFT, 	// !< snapshot running, waiting for left neighbor
+		RIGHT, 	// !< snapshot running, waiting for right neighbor
+		BOTH 		// !< snapshot running, waiting for both neighbors
+	}
+	
+	protected SnapshotState snapshotState = SnapshotState.IDLE;
 
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
@@ -54,6 +72,19 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	}
 
 	synchronized void receiveFish(FishModel fish) {
+		
+		if(snapshotState == SnapshotState.LEFT) {
+			if(fish.getDirection() != Direction.RIGHT) {
+				localSnapshot += 1;
+			}
+		} else if(snapshotState == SnapshotState.RIGHT) {
+			if(fish.getDirection() != Direction.LEFT) {
+				localSnapshot += 1;
+			}
+		} else if(snapshotState == SnapshotState.BOTH) {
+			localSnapshot += 1;
+		}
+		
 		fish.setToStart();
 		fishies.add(fish);
 	}
@@ -155,4 +186,91 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		forwarder.sendToken(right_neighbor);
 	}
 	
+	// global snapshot
+	public synchronized void initiateSnapshot() {
+		localSnapshot = fishies.size();
+		isSnapshot = true;
+		snapshotState = SnapshotState.BOTH;
+		initGlobalSnapshot = true;
+		
+		forwarder.sendSnapshot(right_neighbor, new SnapshotMarker());
+		forwarder.sendSnapshot(left_neighbor, new SnapshotMarker());
+		forwarder.sendSnapToken(left_neighbor, new SnapshotToken());
+	}
+	
+	public synchronized void receiveSnapshot(SnapshotMarker marker, InetSocketAddress sender) {
+		
+		System.out.println("Received snapshot from " + sender);
+		
+		if(!isSnapshot) {
+			isSnapshot = true;
+			localSnapshot = fishies.size();
+			
+			if(sender.equals(left_neighbor)) {
+				snapshotState = SnapshotState.RIGHT;
+				forwarder.sendSnapshot(right_neighbor, new SnapshotMarker());
+			} else if(sender.equals(right_neighbor)) {
+				snapshotState = SnapshotState.LEFT;
+				forwarder.sendSnapshot(left_neighbor, new SnapshotMarker());
+			}
+			
+		} else {
+			
+			Direction direction = sender == left_neighbor ? Direction.LEFT : Direction.RIGHT;
+			
+			if(snapshotState == SnapshotState.RIGHT && direction == Direction.LEFT) {
+				System.out.println("Both snapshots received 1");
+				snapshotState = SnapshotState.IDLE;
+				isSnapshot = false;
+			}
+			
+			if(snapshotState == SnapshotState.LEFT && direction == Direction.RIGHT) {
+				System.out.println("Both snapshots received 2");
+				snapshotState = SnapshotState.IDLE;
+				isSnapshot = false;
+			}
+			
+			if(snapshotState == SnapshotState.BOTH && direction == Direction.LEFT) {
+				System.out.println("Left snapshot received");
+				snapshotState = SnapshotState.RIGHT;
+			} else if(snapshotState == SnapshotState.BOTH && direction == Direction.RIGHT) {
+				System.out.println("Right snapshot received");
+				snapshotState = SnapshotState.LEFT;
+			}
+			
+			if(snapshotState == SnapshotState.IDLE) {
+				System.out.println("[TankID: " + id + "]" +  "Local snapshot: " + localSnapshot );
+				if(snapshotToken != null) {
+					snapshotToken.addLocalCount(localSnapshot);
+					localSnapshot = 0;
+					forwarder.sendSnapToken(left_neighbor, snapshotToken);
+				}
+			}
+		} 
+	}
+	
+	public boolean isSnapshot() {
+		return isSnapshot;
+	}
+	
+	public synchronized void receiveSnapToken(SnapshotToken token){
+		
+		if(this.initGlobalSnapshot && snapshotState == SnapshotState.IDLE) {		
+			this.initGlobalSnapshot = false;
+			token.addLocalCount(localSnapshot);
+			globalSnapshot = token.getGlobalSnapCount();
+		} else {
+			this.snapshotToken = token;
+		}
+		
+		if(snapshotState == SnapshotState.IDLE) {
+			token.addLocalCount(localSnapshot);
+			localSnapshot = 0;
+			forwarder.sendSnapToken(left_neighbor, token);
+		}
+	}
+	
+	public int getGlobalSnapshot() {
+		return globalSnapshot;
+	}
 }

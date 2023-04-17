@@ -13,6 +13,8 @@ import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
 import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
+import aqua.blatt1.common.msgtypes.SnapshotMarker;
+import aqua.blatt1.common.msgtypes.SnapshotToken;
 import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
@@ -52,6 +54,13 @@ public class ClientCommunicator {
 			endpoint.send(neighbor, new Token());
 		}
 		
+		public synchronized void sendSnapshot(InetSocketAddress neighbor, SnapshotMarker snapshotMarker) {
+			endpoint.send(neighbor, snapshotMarker);
+		}
+		
+		public synchronized void sendSnapToken(InetSocketAddress neighbor, SnapshotToken snapshotToken) {
+			endpoint.send(neighbor, snapshotToken);
+		}
 	}
 
 	
@@ -88,6 +97,14 @@ public class ClientCommunicator {
 				// If the message is a PoisonPill, stop the receiver
 				if (msg.getPayload() instanceof PoisonPill)
 					break;
+
+				if (msg.getPayload() instanceof SnapshotMarker) {
+					tankModel.receiveSnapshot((SnapshotMarker) msg.getPayload() , msg.getSender());
+				}
+				
+				if (msg.getPayload() instanceof SnapshotToken) {
+					tankModel.receiveSnapToken((SnapshotToken) msg.getPayload());
+				}
 			}
 			
 			System.out.println("Receiver stopped.");
