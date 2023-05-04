@@ -14,6 +14,8 @@ import java.util.TimerTask;
 import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
+import aqua.blatt1.common.msgtypes.SnapshotMarker;
+import aqua.blatt1.common.msgtypes.SnapshotToken;
 
 import aqua.blatt1.common.msgtypes.SnapshotToken;
 

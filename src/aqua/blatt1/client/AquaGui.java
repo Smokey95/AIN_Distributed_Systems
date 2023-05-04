@@ -21,10 +21,13 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 
 	private final JMenu searchMenu;
 	private final Runnable updateRunnable;
+	
+	private final TankModel tankModel;
 
 	public AquaGui(final TankModel tankModel) {
 		TankView tankView = new TankView(tankModel);
 		tankModel.addObserver(tankView);
+		this.tankModel = tankModel;
 		add(tankView);
 
 		pack();
@@ -81,5 +84,8 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 	public void update(Observable o, Object arg) {
 		SwingUtilities.invokeLater(updateRunnable);
 	}
-
+	
+	public TankModel getTankModel() {
+		return tankModel;
+	}
 }
