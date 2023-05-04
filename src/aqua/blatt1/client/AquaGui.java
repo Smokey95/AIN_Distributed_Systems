@@ -21,10 +21,13 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 
 	private final JMenu searchMenu;
 	private final Runnable updateRunnable;
+	
+	private final TankModel tankModel;
 
 	public AquaGui(final TankModel tankModel) {
 		TankView tankView = new TankView(tankModel);
 		tankModel.addObserver(tankView);
+		this.tankModel = tankModel;
 		add(tankView);
 
 		pack();
@@ -49,7 +52,7 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 		JMenuItem gsMenuItem = new JMenuItem("Global Snapshot");
 		toolsMenu.add(gsMenuItem);
 
-		gsMenuItem.addActionListener(new NotImplementedYetController(this));
+		gsMenuItem.addActionListener(new SnapshotController(this));
 
 		searchMenu = new JMenu("Toggle Fish Color...");
 		toolsMenu.add(searchMenu);
@@ -64,7 +67,7 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 				while (tankModel.getFishCounter() > size) {
 					String fishId = "fish" + (++size) + "@" + tankModel.getId();
 					JMenuItem fishMenuItem = new JMenuItem(fishId);
-					fishMenuItem.addActionListener(new NotImplementedYetController(AquaGui.this));
+					fishMenuItem.addActionListener(new SnapshotController(AquaGui.this));
 					fishMenuItems.add(fishMenuItem);
 					searchMenu.add(fishMenuItem);
 				}
@@ -81,5 +84,8 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 	public void update(Observable o, Object arg) {
 		SwingUtilities.invokeLater(updateRunnable);
 	}
-
+	
+	public TankModel getTankModel() {
+		return tankModel;
+	}
 }

@@ -16,9 +16,12 @@ import javax.swing.*;
 
 import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.client.Aqualife;
+import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
+import aqua.blatt1.common.msgtypes.NeighborUpdate;
+import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt2.PoisonPill;
 import aqua.blatt2.Poisoner;
 
@@ -104,10 +107,18 @@ public class Broker {
       lock.writeLock().lock();
       try{
         cc_list.add("tank" + (curr_client_count), currentMsg.getSender());
+        InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(curr_client_count);
+        InetSocketAddress right_neighbor = cc_list.getRightNeighorOf(curr_client_count);
+        endpoint.send(left_neighbor, new NeighborUpdate(currentMsg.getSender(), Direction.RIGHT));
+        endpoint.send(right_neighbor, new NeighborUpdate(currentMsg.getSender(), Direction.LEFT));
+        endpoint.send(currentMsg.getSender(), new NeighborUpdate(left_neighbor, Direction.LEFT));
+        endpoint.send(currentMsg.getSender(), new NeighborUpdate(right_neighbor, Direction.RIGHT));
         endpoint.send(cc_list.getClient(curr_client_count), new RegisterResponse("tank" + (curr_client_count)));       
         System.out.println("Registered client " + curr_client_count);    
         curr_client_count++;
       } finally {
+        if(curr_client_count == 1)
+          endpoint.send(currentMsg.getSender(), new Token());
         lock.writeLock().unlock();
       }
     }
@@ -120,8 +131,15 @@ public class Broker {
       lock.writeLock().lock();
       try{
         int index = cc_list.indexOf(currentMsg.getSender());
+        InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(index);
+        InetSocketAddress right_neighbor = cc_list.getRightNeighorOf(index);
+        
+        endpoint.send(left_neighbor, new NeighborUpdate(right_neighbor, Direction.RIGHT));
+        endpoint.send(right_neighbor, new NeighborUpdate(left_neighbor, Direction.LEFT));
+        
         System.out.println("Deregistered client " + index);
         cc_list.remove(index);
+        curr_client_count--;
       } finally {
         lock.writeLock().unlock();
       }
@@ -132,6 +150,7 @@ public class Broker {
      * @param currentMsg
      */
     private void handoffFish(Message currentMsg) {
+      System.out.println("DEPRECATED ! Handing off fish in broker");
       lock.readLock().lock();
       int curr_client = cc_list.indexOf(currentMsg.getSender());
       int next_client = (curr_client + 1) % cc_list.size();
@@ -142,7 +161,6 @@ public class Broker {
       lock.readLock().unlock();
     }
   }
-  
   
   /**
    * Broker-Loop. Receives messages from clients and handles them in a BrokerTask thread.
