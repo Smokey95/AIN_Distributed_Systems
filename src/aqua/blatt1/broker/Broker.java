@@ -25,7 +25,6 @@ import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt2.PoisonPill;
 import aqua.blatt2.Poisoner;
 
-
 public class Broker {
   
   Endpoint endpoint;
@@ -79,6 +78,9 @@ public class Broker {
   private class BrokerTask implements Runnable {
   
     Message message;
+    
+    // Initial lease time for a client in milliseconds
+    long init_lease_time = 10000;
 
     public BrokerTask(Message message) {
         this.message = message;
@@ -106,16 +108,54 @@ public class Broker {
     private void register(Message currentMsg) {
       lock.writeLock().lock();
       try{
-        cc_list.add("tank" + (curr_client_count), currentMsg.getSender());
-        InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(curr_client_count);
-        InetSocketAddress right_neighbor = cc_list.getRightNeighorOf(curr_client_count);
-        endpoint.send(left_neighbor, new NeighborUpdate(currentMsg.getSender(), Direction.RIGHT));
-        endpoint.send(right_neighbor, new NeighborUpdate(currentMsg.getSender(), Direction.LEFT));
-        endpoint.send(currentMsg.getSender(), new NeighborUpdate(left_neighbor, Direction.LEFT));
-        endpoint.send(currentMsg.getSender(), new NeighborUpdate(right_neighbor, Direction.RIGHT));
-        endpoint.send(cc_list.getClient(curr_client_count), new RegisterResponse("tank" + (curr_client_count)));       
-        System.out.println("Registered client " + curr_client_count);    
-        curr_client_count++;
+        
+        // Check if client is already Registered
+        // An empty client list will cause an IndexOutOfBoundsException
+        InetSocketAddress currClient = null;
+        try {
+          currClient = cc_list.getClient(cc_list.indexOf(currentMsg.getSender()));
+        } catch (IndexOutOfBoundsException e) {
+          System.out.println("Client list is empty");
+        }
+        
+        // Check if client is already registered
+        if(currClient != null) {
+          
+          System.out.println("Client with ID " + cc_list.getId(cc_list.indexOf(currentMsg.getSender())) + " already registered");
+          
+          // Update client in the client list
+          cc_list.updateClient(cc_list.getId(cc_list.indexOf(currentMsg.getSender())), 
+                               currentMsg.getSender(), 
+                               System.currentTimeMillis());
+                               
+          /*
+           * Resend lease time to client again will cause the client to reset its lease timer.
+           * Also it is possible to send a new lease time to the client.
+          */ 
+          endpoint.send(currentMsg.getSender(), 
+                        new RegisterResponse(cc_list.getId(cc_list.indexOf(currentMsg.getSender())), init_lease_time));
+                        
+        } else {
+          
+          System.out.println("Registered new client with ID: tank" + curr_client_count);
+          
+          // Add client to the client list
+          cc_list.add("tank" + (curr_client_count), currentMsg.getSender(), System.currentTimeMillis());
+          
+          // Send the new client its neighbors
+          InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(curr_client_count);
+          InetSocketAddress right_neighbor = cc_list.getRightNeighorOf(curr_client_count);
+          endpoint.send(left_neighbor, new NeighborUpdate(currentMsg.getSender(), Direction.RIGHT));
+          endpoint.send(right_neighbor, new NeighborUpdate(currentMsg.getSender(), Direction.LEFT));
+          endpoint.send(currentMsg.getSender(), new NeighborUpdate(left_neighbor, Direction.LEFT));
+          endpoint.send(currentMsg.getSender(), new NeighborUpdate(right_neighbor, Direction.RIGHT));
+          
+          // Send the new client its ID
+          endpoint.send(cc_list.getClient(curr_client_count), 
+                        new RegisterResponse("tank" + (curr_client_count), init_lease_time));       
+          
+          curr_client_count++;
+        }
       } finally {
         if(curr_client_count == 1)
           endpoint.send(currentMsg.getSender(), new Token());

@@ -26,7 +26,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	public static final int HEIGHT = 350;
 	protected static final int MAX_FISHIES = 5;
 	protected static final Random rand = new Random();
-	protected volatile String id;
+	protected volatile String id = null;
 	protected final Set<FishModel> fishies;
 	protected int fishCounter = 0;
 	protected int fadingFishCounter = 0;
@@ -53,14 +53,6 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		RIGHT,
 		BOTH
 	}
-
-	//timer for lease
-	TimerTask lease_task = new TimerTask() {
-		@Override
-		public void run() {
-			forwarder.register();
-		}
-	};
 	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
@@ -68,8 +60,22 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	}
 
 	synchronized void onRegistration(RegisterResponse response) {
-		this.id = response.getId();
-		newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
+		
+		// Check if this is the first registration
+		if(this.id == null){
+			this.id = response.getId();
+			newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
+		}
+		
+		//Create new timer for lease
+		TimerTask lease_task = new TimerTask() {
+			@Override
+			public void run() {
+				forwarder.register();
+			}
+		};
+		
+		//Schedule timer
 		leaseTimer.schedule(lease_task, response.getLeaseTime());
 	}
 
