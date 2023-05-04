@@ -14,6 +14,7 @@ import java.util.TimerTask;
 import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
+import aqua.blatt1.common.msgtypes.RegisterResponse;
 import aqua.blatt1.common.msgtypes.SnapshotMarker;
 import aqua.blatt1.common.msgtypes.SnapshotToken;
 
@@ -37,6 +38,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	protected boolean token = false;
 	protected Timer timer = new Timer();
 
+	protected Timer leaseTimer = new Timer();
+
 	protected SnapshotState snapshotState = SnapshotState.IDLE;
 	protected boolean isInitializer = false;
 	protected int localSnapshotCounter = 0;
@@ -51,14 +54,23 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		BOTH
 	}
 
+	//timer for lease
+	TimerTask lease_task = new TimerTask() {
+		@Override
+		public void run() {
+			forwarder.register();
+		}
+	};
+	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
 		this.forwarder = forwarder;
 	}
 
-	synchronized void onRegistration(String id) {
-		this.id = id;
+	synchronized void onRegistration(RegisterResponse response) {
+		this.id = response.getId();
 		newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
+		leaseTimer.schedule(lease_task, response.getLeaseTime());
 	}
 
 	public synchronized void newFish(int x, int y) {
