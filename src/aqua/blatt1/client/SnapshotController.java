@@ -7,26 +7,24 @@ import java.awt.event.ActionListener;
 import javax.swing.JOptionPane;
 
 public class SnapshotController implements ActionListener {
+	private final TankModel tankmodel;
 	
-	private final AquaGui parent;
-
-	public SnapshotController(AquaGui parent) {
-		this.parent = parent;
+	public SnapshotController(TankModel tankmodel) {
+		this.tankmodel = tankmodel;
 	}
 
 	@Override
 	public void actionPerformed(ActionEvent e) {
-		parent.getTankModel().initiateSnapshot();
-		
-		while(!parent.getTankModel().isSnapshot()) {
+		tankmodel.initiateSnapshot();
+
+		//wait for snapshot to finish
+		while(tankmodel.snapshotInProgress) {
 			try {
-				Thread.sleep(100);
+				Thread.sleep(10);
 			} catch (InterruptedException e1) {
 				e1.printStackTrace();
 			}
 		}
-		
-		//JOptionPane.showMessageDialog(parent, "Snapshot Count: " + parent.getTankModel().getGlobalSnapshot(), "Snapshot", JOptionPane.INFORMATION_MESSAGE);
-		//System.out.println("Snapshot Count: " + parent.getTankModel().getGlobalSnapshot());
+		JOptionPane.showMessageDialog(null, "Snapshotcount: " + this.tankmodel.globalSnapshotCounter, "Snapshot finished", JOptionPane.INFORMATION_MESSAGE);
 	}
 }

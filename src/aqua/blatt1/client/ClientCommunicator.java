@@ -54,13 +54,14 @@ public class ClientCommunicator {
 			endpoint.send(neighbor, new Token());
 		}
 		
-		public synchronized void sendSnapshot(InetSocketAddress neighbor, SnapshotMarker snapshotMarker) {
-			endpoint.send(neighbor, snapshotMarker);
+		public synchronized void sendSnapshotMarker(InetSocketAddress neighbor) {
+			endpoint.send(neighbor, new SnapshotMarker());
+		}
+
+		public synchronized void sendSnapshotToken(SnapshotToken token, InetSocketAddress neighbor) {
+			endpoint.send(neighbor, token);
 		}
 		
-		public synchronized void sendSnapToken(InetSocketAddress neighbor, SnapshotToken snapshotToken) {
-			endpoint.send(neighbor, snapshotToken);
-		}
 	}
 
 	
@@ -98,13 +99,17 @@ public class ClientCommunicator {
 				if (msg.getPayload() instanceof PoisonPill)
 					break;
 
-				if (msg.getPayload() instanceof SnapshotMarker) {
-					tankModel.receiveSnapshot((SnapshotMarker) msg.getPayload() , msg.getSender());
-				}
-				
+				if (msg.getPayload() instanceof SnapshotMarker)
+					if(msg.getSender().equals(tankModel.left_neighbor)){
+						tankModel.receiveSnapshotMarker(Direction.LEFT);
+					} else {
+						tankModel.receiveSnapshotMarker(Direction.RIGHT);
+					}
+
 				if (msg.getPayload() instanceof SnapshotToken) {
-					tankModel.receiveSnapToken((SnapshotToken) msg.getPayload());
+					tankModel.receiveSnapshotToken((SnapshotToken) msg.getPayload());
 				}
+					
 			}
 			
 			System.out.println("Receiver stopped.");

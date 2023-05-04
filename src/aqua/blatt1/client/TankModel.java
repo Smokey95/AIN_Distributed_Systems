@@ -17,6 +17,8 @@ import aqua.blatt1.common.FishModel;
 import aqua.blatt1.common.msgtypes.SnapshotMarker;
 import aqua.blatt1.common.msgtypes.SnapshotToken;
 
+import aqua.blatt1.common.msgtypes.SnapshotToken;
+
 public class TankModel extends Observable implements Iterable<FishModel> {
 
 	public static final int WIDTH = 600;
@@ -26,6 +28,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	protected volatile String id;
 	protected final Set<FishModel> fishies;
 	protected int fishCounter = 0;
+	protected int fadingFishCounter = 0;
+
 	protected final ClientCommunicator.ClientForwarder forwarder;
 	protected InetSocketAddress left_neighbor = null;
 	protected InetSocketAddress right_neighbor = null;
@@ -33,21 +37,19 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	protected boolean token = false;
 	protected Timer timer = new Timer();
 
-	protected int localSnapshot = 0; // !< current fish count
-	protected boolean isSnapshot = false; // is a snapshot currently running?
-	
-	protected int globalSnapshot = 0; // !< current fish count
-	protected boolean initGlobalSnapshot = false; // !< is a global snapshot currently running?
-	protected SnapshotToken snapshotToken = null; // !< snapshot token
-	
-	enum SnapshotState {
-		IDLE, 	// !< no snapshot running
-		LEFT, 	// !< snapshot running, waiting for left neighbor
-		RIGHT, 	// !< snapshot running, waiting for right neighbor
-		BOTH 		// !< snapshot running, waiting for both neighbors
-	}
-	
 	protected SnapshotState snapshotState = SnapshotState.IDLE;
+	protected boolean isInitializer = false;
+	protected int localSnapshotCounter = 0;
+	public int globalSnapshotCounter = 0;
+	
+	protected boolean snapshotInProgress = false;
+
+	enum SnapshotState {
+		IDLE,
+		LEFT,
+		RIGHT,
+		BOTH
+	}
 
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
@@ -72,19 +74,18 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	}
 
 	synchronized void receiveFish(FishModel fish) {
-		
-		if(snapshotState == SnapshotState.LEFT) {
-			if(fish.getDirection() != Direction.RIGHT) {
-				localSnapshot += 1;
+		if(snapshotState.equals(SnapshotState.LEFT)) {
+			if (fish.getDirection().equals(Direction.LEFT)) {
+				localSnapshotCounter++;
 			}
-		} else if(snapshotState == SnapshotState.RIGHT) {
-			if(fish.getDirection() != Direction.LEFT) {
-				localSnapshot += 1;
+		} else if(snapshotState.equals(SnapshotState.RIGHT)) {
+			if (fish.getDirection().equals(Direction.RIGHT)) {
+				localSnapshotCounter++;
 			}
-		} else if(snapshotState == SnapshotState.BOTH) {
-			localSnapshot += 1;
+		} else if(snapshotState.equals(SnapshotState.BOTH) 
+		|| snapshotState.equals(SnapshotState.IDLE)) {
+			localSnapshotCounter++;
 		}
-		
 		fish.setToStart();
 		fishies.add(fish);
 	}
@@ -107,13 +108,17 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 
 			fish.update();
 
-			if (fish.hitsEdge() && token)
+			if (fish.hitsEdge() && token) {
 				forwarder.handOff(fish, this);
+				fadingFishCounter++;
+			}
 			else if(fish.hitsEdge() && !token)
 				fish.reverse();
 
-			if (fish.disappears())
+			if (fish.disappears()){
 				it.remove();
+				fadingFishCounter--;
+			}
 		}
 	}
 
@@ -122,6 +127,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		setChanged();
 		notifyObservers();
 	}
+
 
 	/**
 	 * Runs the tank model. This method is called by the client receiver thread.
@@ -186,91 +192,65 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		forwarder.sendToken(right_neighbor);
 	}
 	
-	// global snapshot
 	public synchronized void initiateSnapshot() {
-		localSnapshot = fishies.size();
-		isSnapshot = true;
-		snapshotState = SnapshotState.BOTH;
-		initGlobalSnapshot = true;
-		
-		forwarder.sendSnapshot(right_neighbor, new SnapshotMarker());
-		forwarder.sendSnapshot(left_neighbor, new SnapshotMarker());
-		forwarder.sendSnapToken(left_neighbor, new SnapshotToken());
+		this.snapshotState = SnapshotState.BOTH;
+		this.snapshotInProgress = true;
+
+		this.isInitializer = true;
+		this.localSnapshotCounter = fishies.size() - fadingFishCounter;
+
+		forwarder.sendSnapshotMarker(left_neighbor);
+		forwarder.sendSnapshotMarker(right_neighbor);		
 	}
-	
-	public synchronized void receiveSnapshot(SnapshotMarker marker, InetSocketAddress sender) {
-		
-		System.out.println("Received snapshot from " + sender);
-		
-		if(!isSnapshot) {
-			isSnapshot = true;
-			localSnapshot = fishies.size();
-			
-			if(sender.equals(left_neighbor)) {
-				snapshotState = SnapshotState.RIGHT;
-				forwarder.sendSnapshot(right_neighbor, new SnapshotMarker());
-			} else if(sender.equals(right_neighbor)) {
-				snapshotState = SnapshotState.LEFT;
-				forwarder.sendSnapshot(left_neighbor, new SnapshotMarker());
+
+	public synchronized void receiveSnapshotMarker(Direction dir) {
+		//case idle
+		if(this.snapshotState.equals(SnapshotState.IDLE)) {
+
+			this.localSnapshotCounter = fishies.size() - fadingFishCounter;
+
+			if(dir.equals(Direction.LEFT)){
+				this.snapshotState = SnapshotState.RIGHT;
+				forwarder.sendSnapshotMarker(right_neighbor);
+			}else{
+				this.snapshotState = SnapshotState.LEFT;
+				forwarder.sendSnapshotMarker(left_neighbor);
 			}
-			
+
+		// case both
+		} else if(this.snapshotState.equals(SnapshotState.BOTH)) {
+			if(dir.equals(Direction.LEFT)){
+				this.snapshotState = SnapshotState.RIGHT;
+			}else{
+				this.snapshotState = SnapshotState.LEFT;
+			}
+
+		//case left or right
 		} else {
-			
-			Direction direction = sender == left_neighbor ? Direction.LEFT : Direction.RIGHT;
-			
-			if(snapshotState == SnapshotState.RIGHT && direction == Direction.LEFT) {
-				System.out.println("Both snapshots received 1");
-				snapshotState = SnapshotState.IDLE;
-				isSnapshot = false;
+			this.snapshotState = SnapshotState.IDLE;
+			if(!this.isInitializer) {
+				forwarder.sendSnapshotMarker(dir.equals(Direction.LEFT) ? right_neighbor : left_neighbor);
+				System.out.println("Snapshot complete (Non-Initializer), Fishcount: " + this.localSnapshotCounter);
+			} else {
+				//Snapshot complete
+				//this.isInitializer = false;
+				forwarder.sendSnapshotToken(new SnapshotToken(), left_neighbor);
+				System.out.println("Snapshot complete (Initializer), Fishcount: " + this.localSnapshotCounter);
+
 			}
-			
-			if(snapshotState == SnapshotState.LEFT && direction == Direction.RIGHT) {
-				System.out.println("Both snapshots received 2");
-				snapshotState = SnapshotState.IDLE;
-				isSnapshot = false;
-			}
-			
-			if(snapshotState == SnapshotState.BOTH && direction == Direction.LEFT) {
-				System.out.println("Left snapshot received");
-				snapshotState = SnapshotState.RIGHT;
-			} else if(snapshotState == SnapshotState.BOTH && direction == Direction.RIGHT) {
-				System.out.println("Right snapshot received");
-				snapshotState = SnapshotState.LEFT;
-			}
-			
-			if(snapshotState == SnapshotState.IDLE) {
-				System.out.println("[TankID: " + id + "]" +  "Local snapshot: " + localSnapshot );
-				if(snapshotToken != null) {
-					snapshotToken.addLocalCount(localSnapshot);
-					localSnapshot = 0;
-					forwarder.sendSnapToken(left_neighbor, snapshotToken);
-				}
-			}
-		} 
-	}
-	
-	public boolean isSnapshot() {
-		return isSnapshot;
-	}
-	
-	public synchronized void receiveSnapToken(SnapshotToken token){
-		
-		if(this.initGlobalSnapshot && snapshotState == SnapshotState.IDLE) {		
-			this.initGlobalSnapshot = false;
-			token.addLocalCount(localSnapshot);
-			globalSnapshot = token.getGlobalSnapCount();
-		} else {
-			this.snapshotToken = token;
-		}
-		
-		if(snapshotState == SnapshotState.IDLE) {
-			token.addLocalCount(localSnapshot);
-			localSnapshot = 0;
-			forwarder.sendSnapToken(left_neighbor, token);
 		}
 	}
-	
-	public int getGlobalSnapshot() {
-		return globalSnapshot;
+
+	public synchronized void receiveSnapshotToken(SnapshotToken token) {
+		System.out.println(token.getGlobalCounter());
+		if (!this.isInitializer) {
+			token.addGlobalCounter(this.localSnapshotCounter);
+			forwarder.sendSnapshotToken(token, left_neighbor);
+		} else if (this.isInitializer) {
+			token.addGlobalCounter(this.localSnapshotCounter);
+			this.globalSnapshotCounter = token.getGlobalCounter();
+			this.snapshotInProgress = false;	
+			this.isInitializer = false;
+		}
 	}
 }
