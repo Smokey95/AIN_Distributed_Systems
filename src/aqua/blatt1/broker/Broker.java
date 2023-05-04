@@ -12,11 +12,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Timer;
 import javax.swing.*;
 
 import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.client.Aqualife;
 import aqua.blatt1.common.Direction;
+import aqua.blatt1.common.Properties;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
@@ -32,6 +34,10 @@ public class Broker {
   // The list of clients uses InetSocketAddress as type for the key and String as type for the value.
   // InetSocketAddress is used as key because it is unique for each client and can be used to identify a client.
   ClientCollection<InetSocketAddress> cc_list;
+  private Timer leaseTimeCheck = new Timer();
+  
+  // Initial lease time for a client in milliseconds
+  long init_lease_time = 10000;
   
   // Thread List
   List<Thread> clientThreads = new LinkedList<Thread>();
@@ -78,9 +84,6 @@ public class Broker {
   private class BrokerTask implements Runnable {
   
     Message message;
-    
-    // Initial lease time for a client in milliseconds
-    long init_lease_time = 10000;
 
     public BrokerTask(Message message) {
         this.message = message;
@@ -168,9 +171,12 @@ public class Broker {
      * @param currentMsg
      */
     private void deregister(Message currentMsg) {
+      
       lock.writeLock().lock();
+      
       try{
         int index = cc_list.indexOf(currentMsg.getSender());
+        
         InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(index);
         InetSocketAddress right_neighbor = cc_list.getRightNeighorOf(index);
         
@@ -180,6 +186,8 @@ public class Broker {
         System.out.println("Deregistered client " + index);
         cc_list.remove(index);
         curr_client_count--;
+      } catch (Exception e) {
+        System.out.println("Exception in deregister");
       } finally {
         lock.writeLock().unlock();
       }
@@ -202,6 +210,56 @@ public class Broker {
     }
   }
   
+  
+  private class LeasesTask implements Runnable {
+      
+      @Override
+      public void run() {
+        
+        System.out.println("LeasesTask started, will check for disconnected clients every " + init_lease_time * 2 + "ms");
+        
+        while(!stopRequested) {
+          
+          try {
+            Thread.sleep(init_lease_time * 2);
+            //Thread.sleep(1000);           // For testing purposes
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          
+          lock.writeLock().lock();
+          
+          try {
+            System.out.println("Checking for disconnected clients");
+            for(int i = 0; i < cc_list.size(); i++) {
+              
+              //if(System.currentTimeMillis() - cc_list.getTimestamp(i) > init_lease_time || i == 0) {  // For testing purposes (force disconnect client 0)
+              if(System.currentTimeMillis() - cc_list.getTimestamp(i) > init_lease_time) {
+                System.out.println("Client " + cc_list.getId(i) + " has been removed due to timeout");
+                
+                InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(i);
+                InetSocketAddress right_neighbor = cc_list.getRightNeighorOf(i);
+        
+                endpoint.send(left_neighbor, new NeighborUpdate(right_neighbor, Direction.RIGHT));
+                endpoint.send(right_neighbor, new NeighborUpdate(left_neighbor, Direction.LEFT));
+        
+                // Send a PoisonPill to the client
+                endpoint.send(cc_list.getClient(i), new PoisonPill());
+                
+                // Remove the client from the client list
+                cc_list.remove(i);
+                curr_client_count--;
+              }
+            }
+          } catch (Exception e) {
+            System.out.println("Exception in LeasesTask");
+          } finally {
+            lock.writeLock().unlock();
+          }
+        }
+      }
+  }
+  
   /**
    * Broker-Loop. Receives messages from clients and handles them in a BrokerTask thread.
    */
@@ -212,6 +270,9 @@ public class Broker {
     // Create a new thread for the shutdown pane
     new Thread(() -> Poisoner.main(null)).start();
     
+    // Create a new thread for the lease time check
+    new Thread(new LeasesTask()).start();
+
     // Broker-Loop in a seperate thread
     while (true) {
       
@@ -224,11 +285,17 @@ public class Broker {
         for(int i = 0; i < cc_list.size(); i++) {
           endpoint.send(cc_list.getClient(i), new PoisonPill());
         }
+        
+        // Set the stopRequested flag to true to stop other broker threads (like the LeasesTask)
+        stopRequested = true;
+        
         break;
       }
       
       // Handle the message in a separated BrokerTask thread
       executor.execute(new BrokerTask(message));
+      
+      
     }
     
     // Executor-Service has to be shutdown to terminate the program

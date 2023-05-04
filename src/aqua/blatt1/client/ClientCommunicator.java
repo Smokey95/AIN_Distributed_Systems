@@ -28,8 +28,9 @@ public class ClientCommunicator {
 
 	
 	public class ClientForwarder {
+		
 		private final InetSocketAddress broker;
-
+		
 		private ClientForwarder() {
 			this.broker = new InetSocketAddress(Properties.HOST, Properties.PORT);
 		}
