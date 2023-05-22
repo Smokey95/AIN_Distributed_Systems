@@ -16,6 +16,7 @@ import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
 import aqua.blatt1.common.msgtypes.SnapshotMarker;
 import aqua.blatt1.common.msgtypes.SnapshotToken;
+import aqua.blatt1.common.msgtypes.LocationRequest;
 import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
@@ -64,6 +65,9 @@ public class ClientCommunicator {
 			endpoint.send(neighbor, token);
 		}
 		
+		public synchronized void locateFishie(InetSocketAddress neighbor, String fish) {
+			endpoint.send(neighbor, new LocationRequest(fish));
+		}
 	}
 
 	
@@ -112,7 +116,11 @@ public class ClientCommunicator {
 				if (msg.getPayload() instanceof SnapshotToken) {
 					tankModel.receiveSnapshotToken((SnapshotToken) msg.getPayload());
 				}
-					
+
+				if (msg.getPayload() instanceof LocationRequest) {
+					LocationRequest req = (LocationRequest) msg.getPayload();
+					tankModel.locateFishGlobally(req.getFish());
+				}
 			}
 			
 			System.out.println("Receiver stopped.");

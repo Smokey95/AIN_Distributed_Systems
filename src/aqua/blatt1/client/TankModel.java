@@ -3,6 +3,7 @@ package aqua.blatt1.client;
 import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Observable;
 import java.util.Random;
 import java.util.Set;
@@ -27,7 +28,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	protected static final int MAX_FISHIES = 5;
 	protected static final Random rand = new Random();
 	protected volatile String id = null;
-	protected final Set<FishModel> fishies;
+	protected final Set<FishModel> fishies;												//Set of fish in tank
 	protected int fishCounter = 0;
 	protected int fadingFishCounter = 0;
 
@@ -47,6 +48,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	protected boolean snapshotInProgress = false;
 
+	protected final Map<String, FishState> fishiesMasterList;
+
 	enum SnapshotState {
 		IDLE,
 		LEFT,
@@ -54,8 +57,15 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		BOTH
 	}
 	
+	enum FishState {
+		HERE,
+		LEFT,
+		RIGHT
+	}
+	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
+		this.fishiesMasterList = new ConcurrentHashMap<String, FishState>();
 		this.forwarder = forwarder;
 	}
 
@@ -88,6 +98,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 					rand.nextBoolean() ? Direction.LEFT : Direction.RIGHT);
 
 			fishies.add(fish);
+			fishiesMasterList.put(fish.getId(), FishState.HERE);
 		}
 	}
 
@@ -106,6 +117,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		}
 		fish.setToStart();
 		fishies.add(fish);
+		fishiesMasterList.put(fish.getId(), FishState.HERE);
 	}
 
 	public String getId() {
@@ -128,6 +140,13 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 
 			if (fish.hitsEdge() && token) {
 				forwarder.handOff(fish, this);
+				
+				if(fish.getDirection().equals(Direction.LEFT)) {
+					fishiesMasterList.put(fish.getId(), FishState.LEFT);
+				} else if(fish.getDirection().equals(Direction.RIGHT)) {
+					fishiesMasterList.put(fish.getId(), FishState.RIGHT);
+				}
+
 				fadingFishCounter++;
 			}
 			else if(fish.hitsEdge() && !token)
@@ -269,6 +288,33 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 			this.globalSnapshotCounter = token.getGlobalCounter();
 			this.snapshotInProgress = false;	
 			this.isInitializer = false;
+		}
+	}
+	
+	public synchronized void locateFishGlobally(String fishId) {
+		
+		FishModel fish_tmp = null;
+		
+		//check if fishID is present (FishState.HERE)
+		if(fishiesMasterList.containsKey(fishId)) {
+			//if present, return fish
+			if(fishiesMasterList.get(fishId).equals(FishState.HERE)) {
+				System.out.println("Fish " + fishId + " is here");
+				for(FishModel fish : fishies) {
+					if(fish.getId().equals(fishId)) {
+						fish.toggle();
+					}
+				}
+			} else if(fishiesMasterList.get(fishId).equals(FishState.LEFT)) {
+				System.out.println("Fish " + fishId + " was swimming out of the pot to the left");
+				forwarder.locateFishie(left_neighbor, fishId);
+			} else if(fishiesMasterList.get(fishId).equals(FishState.RIGHT)) {
+				System.out.println("Fish " + fishId + " was swimming out of the pot to the right");
+				forwarder.locateFishie(right_neighbor, fishId);
+			}
+			
+		} else {
+			System.out.println("This should not happen, fish was never seen");
 		}
 	}
 }
