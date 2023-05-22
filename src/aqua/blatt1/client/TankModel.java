@@ -14,6 +14,7 @@ import java.util.TimerTask;
 import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
+import aqua.blatt1.common.msgtypes.RegisterResponse;
 import aqua.blatt1.common.msgtypes.SnapshotMarker;
 import aqua.blatt1.common.msgtypes.SnapshotToken;
 
@@ -25,7 +26,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	public static final int HEIGHT = 350;
 	protected static final int MAX_FISHIES = 5;
 	protected static final Random rand = new Random();
-	protected volatile String id;
+	protected volatile String id = null;
 	protected final Set<FishModel> fishies;
 	protected int fishCounter = 0;
 	protected int fadingFishCounter = 0;
@@ -36,6 +37,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	protected boolean token = false;
 	protected Timer timer = new Timer();
+
+	protected Timer leaseTimer = new Timer();
 
 	protected SnapshotState snapshotState = SnapshotState.IDLE;
 	protected boolean isInitializer = false;
@@ -50,15 +53,30 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		RIGHT,
 		BOTH
 	}
-
+	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
 		this.forwarder = forwarder;
 	}
 
-	synchronized void onRegistration(String id) {
-		this.id = id;
-		newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
+	synchronized void onRegistration(RegisterResponse response) {
+		
+		// Check if this is the first registration
+		if(this.id == null){
+			this.id = response.getId();
+			newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
+		}
+		
+		//Create new timer for lease
+		TimerTask lease_task = new TimerTask() {
+			@Override
+			public void run() {
+				forwarder.register();
+			}
+		};
+		
+		//Schedule timer
+		leaseTimer.schedule(lease_task, response.getLeaseTime());
 	}
 
 	public synchronized void newFish(int x, int y) {

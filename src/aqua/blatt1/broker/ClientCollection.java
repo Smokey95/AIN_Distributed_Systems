@@ -12,10 +12,12 @@ public class ClientCollection<T> {
 	private class Client {
 		final String id;
 		final T client;
+		final long timestamp;
 
-		Client(String id, T client) {
+		Client(String id, T client, long timestamp) {
 			this.id = id;
 			this.client = client;
+			this.timestamp = timestamp;
 		}
 	}
 
@@ -25,8 +27,8 @@ public class ClientCollection<T> {
 		clients = new ArrayList<Client>();
 	}
 
-	public ClientCollection<T> add(String id, T client) {
-		clients.add(new Client(id, client));
+	public ClientCollection<T> add(String id, T client, long timestamp) {
+		clients.add(new Client(id, client, timestamp));
 		return this;
 	}
 
@@ -52,6 +54,10 @@ public class ClientCollection<T> {
 	public T getClient(int index) {
 		return clients.get(index).client;
 	}
+	
+	public String getId(int index) {
+		return clients.get(index).id;
+	}
 
 	public int size() {
 		return clients.size();
@@ -63,6 +69,21 @@ public class ClientCollection<T> {
 
 	public T getRightNeighorOf(int index) {
 		return index < clients.size() - 1 ? clients.get(index + 1).client : clients.get(0).client;
+	}
+	
+	public long getTimestamp(int index) {
+		return clients.get(index).timestamp;
+	}
+	
+	public int updateClient(String id, T client, long timestamp) {
+		int index = indexOf(id);
+		if (index >= 0) {
+			clients.set(index, new Client(id, client, timestamp));
+			return index;
+		} else {
+			return -1;
+		}
+		
 	}
 
 }
