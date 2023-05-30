@@ -19,6 +19,7 @@ import aqua.blatt1.common.msgtypes.SnapshotToken;
 import aqua.blatt1.common.msgtypes.NameResolutionRequest;
 import aqua.blatt1.common.msgtypes.NameResolutionResponse;
 import aqua.blatt1.common.msgtypes.LocationUpdate;
+import aqua.blatt1.common.msgtypes.LocationRequest;
 import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
@@ -75,6 +76,9 @@ public class ClientCommunicator {
 			// @TODO: Implement
 		}
 		
+		public synchronized void locateFishie(InetSocketAddress neighbor, String fish) {
+			endpoint.send(neighbor, new LocationRequest(fish));
+		}
 	}
 
 	
@@ -127,6 +131,11 @@ public class ClientCommunicator {
 				if (msg.getPayload() instanceof NameResolutionResponse) {
 					NameResolutionResponse response = (NameResolutionResponse) msg.getPayload();
 					tankModel.receiveNameResolutionResponse(response.getRequestId(), response.getAddress());
+				}
+
+				if (msg.getPayload() instanceof LocationRequest) {
+					LocationRequest req = (LocationRequest) msg.getPayload();
+					tankModel.locateFishGlobally(req.getFish());
 				}
 			}
 			

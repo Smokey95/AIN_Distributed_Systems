@@ -3,6 +3,7 @@ package aqua.blatt1.client;
 import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Observable;
 import java.util.Random;
 import java.util.Set;
@@ -50,6 +51,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	protected boolean snapshotInProgress = false;
 
+	protected final Map<String, FishState> fishiesMasterList;
+
 	enum SnapshotState {
 		IDLE,
 		LEFT,
@@ -57,9 +60,16 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		BOTH
 	}
 	
+	enum FishState {
+		HERE,
+		LEFT,
+		RIGHT
+	}
+	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
 		this.homeAgent = new ConcurrentHashMap<String, InetSocketAddress>();
+		this.fishiesMasterList = new ConcurrentHashMap<String, FishState>();
 		this.forwarder = forwarder;
 	}
 
@@ -98,6 +108,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 
 			fishies.add(fish);																																	//! Add fish to tank
 			homeAgent.put(fish.getId(), null);																						//! Add fish to home agent map
+			fishiesMasterList.put(fish.getId(), FishState.HERE);																//! Add fish to master list
 		}
 	}
 
@@ -131,6 +142,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		
 		fish.setToStart();
 		fishies.add(fish);
+		fishiesMasterList.put(fish.getId(), FishState.HERE);
 	}
 
 	public String getId() {
@@ -153,6 +165,13 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 
 			if (fish.hitsEdge() && token) {
 				forwarder.handOff(fish, this);
+				
+				if(fish.getDirection().equals(Direction.LEFT)) {
+					fishiesMasterList.put(fish.getId(), FishState.LEFT);
+				} else if(fish.getDirection().equals(Direction.RIGHT)) {
+					fishiesMasterList.put(fish.getId(), FishState.RIGHT);
+				}
+
 				fadingFishCounter++;
 			}
 			else if(fish.hitsEdge() && !token)
@@ -301,5 +320,33 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		
 		// inform home agent of fish
 		// @TODO: Implement
+
+	}
+	
+	public synchronized void locateFishGlobally(String fishId) {
+		
+		FishModel fish_tmp = null;
+		
+		//check if fishID is present (FishState.HERE)
+		if(fishiesMasterList.containsKey(fishId)) {
+			//if present, return fish
+			if(fishiesMasterList.get(fishId).equals(FishState.HERE)) {
+				System.out.println("Fish " + fishId + " is here");
+				for(FishModel fish : fishies) {
+					if(fish.getId().equals(fishId)) {
+						fish.toggle();
+					}
+				}
+			} else if(fishiesMasterList.get(fishId).equals(FishState.LEFT)) {
+				System.out.println("Fish " + fishId + " was swimming out of the pot to the left");
+				forwarder.locateFishie(left_neighbor, fishId);
+			} else if(fishiesMasterList.get(fishId).equals(FishState.RIGHT)) {
+				System.out.println("Fish " + fishId + " was swimming out of the pot to the right");
+				forwarder.locateFishie(right_neighbor, fishId);
+			}
+			
+		} else {
+			System.out.println("This should not happen, fish was never seen");
+		}
 	}
 }
