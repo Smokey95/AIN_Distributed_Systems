@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.Map;
 
 import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
@@ -22,12 +23,14 @@ import aqua.blatt1.common.msgtypes.SnapshotToken;
 
 public class TankModel extends Observable implements Iterable<FishModel> {
 
-	public static final int WIDTH = 600;
-	public static final int HEIGHT = 350;
-	protected static final int MAX_FISHIES = 5;
-	protected static final Random rand = new Random();
-	protected volatile String id = null;
-	protected final Set<FishModel> fishies;
+	public static final int WIDTH = 600;																										//! Width of the tank				
+	public static final int HEIGHT = 350;																										//! Height of the tank	
+	protected static final int MAX_FISHIES = 5;																							//! Maximum number of fish in the tank
+	protected static final Random rand = new Random(); 																			//! Random number generator
+	
+	protected volatile String id = null;																										//! ID of the tank
+	protected final Set<FishModel> fishies;																									//! Set of fish in the tank
+	protected final Map<String, InetSocketAddress> homeAgent;																//! Map of home agents
 	protected int fishCounter = 0;
 	protected int fadingFishCounter = 0;
 
@@ -56,6 +59,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
+		this.homeAgent = new ConcurrentHashMap<String, InetSocketAddress>();
 		this.forwarder = forwarder;
 	}
 
@@ -87,7 +91,8 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 			FishModel fish = new FishModel("fish" + (++fishCounter) + "@" + getId(), x, y,
 					rand.nextBoolean() ? Direction.LEFT : Direction.RIGHT);
 
-			fishies.add(fish);
+			fishies.add(fish);																																	//! Add fish to tank
+			homeAgent.put(fish.getId(), null);																						//! Add fish to home agent map
 		}
 	}
 
