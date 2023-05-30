@@ -21,6 +21,8 @@ import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.Properties;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
+import aqua.blatt1.common.msgtypes.NameResolutionRequest;
+import aqua.blatt1.common.msgtypes.NameResolutionResponse;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
 import aqua.blatt1.common.msgtypes.Token;
@@ -101,6 +103,9 @@ public class Broker {
       }
       if (payload instanceof HandoffRequest){
         handoffFish(message);
+      }
+      if (payload instanceof NameResolutionRequest){
+        resolveName(message);
       }
     }
     
@@ -207,6 +212,25 @@ public class Broker {
         
       endpoint.send(cc_list.getClient(next_client), new HandoffRequest(((HandoffRequest) currentMsg.getPayload()).getFish()));
       lock.readLock().unlock();
+    }
+    
+    /**
+     * Determines the InetSocketAddress of the according TankID and returns it to sender
+     * @param currentMsg
+     */
+    private void resolveName(Message currentMsg) {
+      lock.readLock().lock();
+      try {
+        int index = cc_list.indexOf(currentMsg.getSender());
+        String tankID = ((NameResolutionRequest) currentMsg.getPayload()).getTankId();
+        String requestID = ((NameResolutionRequest) currentMsg.getPayload()).getRequestId();
+        InetSocketAddress addr = cc_list.getClient(cc_list.indexOf(tankID));
+        endpoint.send(cc_list.getClient(index), new NameResolutionResponse(requestID, addr));
+      } catch (Exception e) {
+        System.out.println("Exception in resolveName");
+      } finally {
+        lock.readLock().unlock();
+      }
     }
   }
   
