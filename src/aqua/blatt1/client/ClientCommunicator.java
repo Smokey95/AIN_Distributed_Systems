@@ -16,6 +16,9 @@ import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
 import aqua.blatt1.common.msgtypes.SnapshotMarker;
 import aqua.blatt1.common.msgtypes.SnapshotToken;
+import aqua.blatt1.common.msgtypes.NameResolutionRequest;
+import aqua.blatt1.common.msgtypes.NameResolutionResponse;
+import aqua.blatt1.common.msgtypes.LocationUpdate;
 import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
@@ -62,6 +65,14 @@ public class ClientCommunicator {
 
 		public synchronized void sendSnapshotToken(SnapshotToken token, InetSocketAddress neighbor) {
 			endpoint.send(neighbor, token);
+		}
+		
+		public synchronized void sendNameResolutionRequest(String tankId, String requestId) {
+			endpoint.send(broker, new NameResolutionRequest(tankId, requestId));
+		}
+		
+		public synchronized void sendLocationUpdate(String fishId, InetSocketAddress home_Agent) {
+			// @TODO: Implement
 		}
 		
 	}
@@ -113,6 +124,10 @@ public class ClientCommunicator {
 					tankModel.receiveSnapshotToken((SnapshotToken) msg.getPayload());
 				}
 					
+				if (msg.getPayload() instanceof NameResolutionResponse) {
+					NameResolutionResponse response = (NameResolutionResponse) msg.getPayload();
+					tankModel.receiveNameResolutionResponse(response.getRequestId(), response.getAddress());
+				}
 			}
 			
 			System.out.println("Receiver stopped.");

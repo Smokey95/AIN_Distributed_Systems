@@ -83,6 +83,11 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		leaseTimer.schedule(lease_task, response.getLeaseTime());
 	}
 
+	/**
+	 * Adds a fish to the tank at the specified position.
+	 * @param x x-coordinate of the new fish
+	 * @param y y-coordinate of the new fish
+	 */
 	public synchronized void newFish(int x, int y) {
 		if (fishies.size() < MAX_FISHIES) {
 			x = x > WIDTH - FishModel.getXSize() - 1 ? WIDTH - FishModel.getXSize() - 1 : x;
@@ -96,7 +101,13 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		}
 	}
 
+	/**
+	 * Receives a fish from another tank.
+	 * @param fish the fish to receive
+	 */
 	synchronized void receiveFish(FishModel fish) {
+		
+		// Check if there is a snapshot in progress
 		if(snapshotState.equals(SnapshotState.LEFT)) {
 			if (fish.getDirection().equals(Direction.LEFT)) {
 				localSnapshotCounter++;
@@ -109,6 +120,15 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		|| snapshotState.equals(SnapshotState.IDLE)) {
 			localSnapshotCounter++;
 		}
+		
+		// Check if the fish is home based in this tank and update its position (null cause it is home based)
+		if(homeAgent.containsKey(fish.getId())) {
+			homeAgent.put(fish.getId(), null);
+		} else {
+			// Request home agent of fish and update its position
+			forwarder.sendNameResolutionRequest(fish.getTankId(), fish.getId());
+		}
+		
 		fish.setToStart();
 		fishies.add(fish);
 	}
@@ -275,5 +295,11 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 			this.snapshotInProgress = false;	
 			this.isInitializer = false;
 		}
+	}
+	
+	public synchronized void receiveNameResolutionResponse(String requestID, InetSocketAddress homeAgentAddress) {
+		
+		// inform home agent of fish
+		// @TODO: Implement
 	}
 }
