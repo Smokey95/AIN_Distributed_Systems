@@ -13,12 +13,12 @@ import java.net.InetSocketAddress;
 public class LocationUpdate implements Serializable{
   
   private final String fishId;
-  private final InetSocketAddress current_Address;
+  private final InetSocketAddress newTankAddress;
   
   // Constructor
-  public LocationUpdate(String fishId, InetSocketAddress current_Address) {
+  public LocationUpdate(String fishId, InetSocketAddress newTankAddress) {
     this.fishId = fishId;
-    this.current_Address = current_Address;
+    this.newTankAddress = newTankAddress;
   }
   
   // Returns the fish ID of the fish whose address is to be updated
@@ -27,7 +27,7 @@ public class LocationUpdate implements Serializable{
   }
   
   // Returns the address of the current tank
-  public InetSocketAddress getCurrent_Address() {
-    return current_Address;
+  public InetSocketAddress newTankAddress() {
+    return newTankAddress;
   }
 }

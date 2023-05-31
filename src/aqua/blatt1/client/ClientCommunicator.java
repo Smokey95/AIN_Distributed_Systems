@@ -72,8 +72,8 @@ public class ClientCommunicator {
 			endpoint.send(broker, new NameResolutionRequest(tankId, requestId));
 		}
 		
-		public synchronized void sendLocationUpdate(String fishId, InetSocketAddress home_Agent) {
-			// @TODO: Implement
+		public synchronized void sendLocationUpdate(String fishId, InetSocketAddress homeAgentAddress, InetSocketAddress newTankAddress) {
+			endpoint.send(homeAgentAddress, new LocationUpdate(fishId, newTankAddress));
 		}
 		
 		public synchronized void locateFishie(InetSocketAddress neighbor, String fish) {
@@ -136,6 +136,11 @@ public class ClientCommunicator {
 				if (msg.getPayload() instanceof LocationRequest) {
 					LocationRequest req = (LocationRequest) msg.getPayload();
 					tankModel.locateFishGlobally(req.getFish());
+				}
+				
+				if (msg.getPayload() instanceof LocationUpdate) {
+					LocationUpdate update = (LocationUpdate) msg.getPayload();
+					tankModel.receiveLocationUpdate(update.getFishId(), update.newTankAddress());
 				}
 			}
 			

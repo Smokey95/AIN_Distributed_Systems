@@ -2,6 +2,7 @@ package aqua.blatt1.client;
 
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Observable;
@@ -31,13 +32,14 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	protected volatile String id = null;																										//! ID of the tank
 	protected final Set<FishModel> fishies;																									//! Set of fish in the tank
-	protected final Map<String, InetSocketAddress> homeAgent;																//! Map of home agents
+	protected final Map<String, InetSocketAddress> homeAgent;																//! Map of home agents, maps fishID to tankID
 	protected int fishCounter = 0;
 	protected int fadingFishCounter = 0;
 
 	protected final ClientCommunicator.ClientForwarder forwarder;
 	protected InetSocketAddress left_neighbor = null;
 	protected InetSocketAddress right_neighbor = null;
+	protected InetSocketAddress homeAgentUpdate = null;
 	
 	protected boolean token = false;
 	protected Timer timer = new Timer();
@@ -51,8 +53,6 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 	
 	protected boolean snapshotInProgress = false;
 
-	protected final Map<String, FishState> fishiesMasterList;
-
 	enum SnapshotState {
 		IDLE,
 		LEFT,
@@ -60,16 +60,20 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		BOTH
 	}
 	
+	/*
+	protected final Map<String, FishState> fishiesMasterList;
+
 	enum FishState {
 		HERE,
 		LEFT,
 		RIGHT
 	}
+	*/
 	
 	public TankModel(ClientCommunicator.ClientForwarder forwarder) {
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
-		this.homeAgent = new ConcurrentHashMap<String, InetSocketAddress>();
-		this.fishiesMasterList = new ConcurrentHashMap<String, FishState>();
+		this.homeAgent = Collections.synchronizedMap(new HashMap<>());
+		//this.fishiesMasterList = new ConcurrentHashMap<String, FishState>();
 		this.forwarder = forwarder;
 	}
 
@@ -108,7 +112,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 
 			fishies.add(fish);																																	//! Add fish to tank
 			homeAgent.put(fish.getId(), null);																						//! Add fish to home agent map
-			fishiesMasterList.put(fish.getId(), FishState.HERE);																//! Add fish to master list
+			//fishiesMasterList.put(fish.getId(), FishState.HERE);																//! Add fish to master list
 		}
 	}
 
@@ -134,15 +138,18 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		
 		// Check if the fish is home based in this tank and update its position (null cause it is home based)
 		if(homeAgent.containsKey(fish.getId())) {
+			System.out.println("Fish " + fish.getId() + " is home based in this tank");
 			homeAgent.put(fish.getId(), null);
+			printHomeAgent();
 		} else {
+			System.out.println("Fish " + fish.getId() + " is not home based in this tank, inform home agent");
 			// Request home agent of fish and update its position
 			forwarder.sendNameResolutionRequest(fish.getTankId(), fish.getId());
 		}
 		
 		fish.setToStart();
 		fishies.add(fish);
-		fishiesMasterList.put(fish.getId(), FishState.HERE);
+		//fishiesMasterList.put(fish.getId(), FishState.HERE);
 	}
 
 	public String getId() {
@@ -166,11 +173,11 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 			if (fish.hitsEdge() && token) {
 				forwarder.handOff(fish, this);
 				
-				if(fish.getDirection().equals(Direction.LEFT)) {
-					fishiesMasterList.put(fish.getId(), FishState.LEFT);
-				} else if(fish.getDirection().equals(Direction.RIGHT)) {
-					fishiesMasterList.put(fish.getId(), FishState.RIGHT);
-				}
+				//if(fish.getDirection().equals(Direction.LEFT)) {
+				//	fishiesMasterList.put(fish.getId(), FishState.LEFT);
+				//} else if(fish.getDirection().equals(Direction.RIGHT)) {
+				//	fishiesMasterList.put(fish.getId(), FishState.RIGHT);
+				//}
 
 				fadingFishCounter++;
 			}
@@ -316,37 +323,77 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 		}
 	}
 	
-	public synchronized void receiveNameResolutionResponse(String requestID, InetSocketAddress homeAgentAddress) {
+	/**
+	 * Receive the InetSocketAddress of the home agent for a fish.
+	 * Update the home agent map with the new information.
+	 * @param requestID the ID of the fish
+	 * @param resolvedAddress the InetSocketAddress of the home agent
+	 */
+	public synchronized void receiveNameResolutionResponse(String requestID, InetSocketAddress resolvedAddress) {
 		
-		// inform home agent of fish
-		// @TODO: Implement
-
+		// check requestID (contains no "#" if the own address is unknown)
+		if(!requestID.contains("#")) {
+			// own address is unknown
+			System.out.println("Own address is unknown, requesting from broker");
+			
+			// store address of home agent to inform it of the new tank location
+			this.homeAgentUpdate = resolvedAddress; 
+			
+			// add marker to requestID to indicate that the request is for the own address
+			requestID = "#" + requestID;
+			
+			// request own address from broker to update home agent of new fish tank location
+			forwarder.sendNameResolutionRequest(this.id, requestID);
+		} else {
+			// own address is known
+			System.out.println("Own address is known, updating home agent");
+			
+			// inform home agent of fish of the new tank location
+			forwarder.sendLocationUpdate(requestID, this.homeAgentUpdate, resolvedAddress);
+		}
+	}
+	
+	public synchronized void receiveLocationUpdate(String fishID, InetSocketAddress newTankAddress) {
+		System.out.println("Received location update for fish " + fishID + " from " + newTankAddress);
+		// update home agent of fish location
+		
+		// remove "#" from fishID
+		fishID = fishID.substring(1);
+		
+		homeAgent.put(fishID, newTankAddress);
+		printHomeAgent();
 	}
 	
 	public synchronized void locateFishGlobally(String fishId) {
 		
-		FishModel fish_tmp = null;
+		System.out.println("Locating fish globally, home agent value is " + homeAgent.get(fishId));
 		
-		//check if fishID is present (FishState.HERE)
-		if(fishiesMasterList.containsKey(fishId)) {
-			//if present, return fish
-			if(fishiesMasterList.get(fishId).equals(FishState.HERE)) {
-				System.out.println("Fish " + fishId + " is here");
-				for(FishModel fish : fishies) {
-					if(fish.getId().equals(fishId)) {
-						fish.toggle();
-					}
+		//check if fishID is present in local tank
+		if(homeAgent.get(fishId) == null) {
+			//fish is present in local tank
+			//send response to client
+			System.out.println("Fish found in local tank");
+			for(FishModel fish : fishies){
+				if(fish.getId().equals(fishId)){
+					fish.toggle();
 				}
-			} else if(fishiesMasterList.get(fishId).equals(FishState.LEFT)) {
-				System.out.println("Fish " + fishId + " was swimming out of the pot to the left");
-				forwarder.locateFishie(left_neighbor, fishId);
-			} else if(fishiesMasterList.get(fishId).equals(FishState.RIGHT)) {
-				System.out.println("Fish " + fishId + " was swimming out of the pot to the right");
-				forwarder.locateFishie(right_neighbor, fishId);
 			}
-			
 		} else {
-			System.out.println("This should not happen, fish was never seen");
+			//fish is not present in local tank
+			//send request to home agent
+			System.out.println("Fish is located in other tank, forwarding request to home agent");
+			forwarder.locateFishie(homeAgent.get(fishId), fishId);
+		}
+	}
+	
+	
+	/**
+	 * Print the home agent map. Used for debugging.
+	 */
+	private synchronized void printHomeAgent() {
+		System.out.println("Home agent map:");
+		for(String fishId : homeAgent.keySet()) {
+			System.out.println(fishId + " -> " + homeAgent.get(fishId));
 		}
 	}
 }
