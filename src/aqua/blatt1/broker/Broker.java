@@ -1,4 +1,17 @@
+/**
+ * Broker.java
+ * Broker is the central component of the system. It is responsible for
+ * - registering clients and assigning them a unique ID.
+ * - keeping track of the clients and their locations
+ * - forwarding messages between clients
+ * - deregistering clients
+ */
+
 package aqua.blatt1.broker;
+
+/******************************************************************************/
+/******************************** Imports *************************************/
+/******************************************************************************/
 
 import messaging.Endpoint;
 import messaging.Message;
@@ -6,19 +19,12 @@ import messaging.Message;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Scanner;
-import java.util.Timer;
-import javax.swing.*;
 
-import aqua.blatt1.common.msgtypes.RegisterRequest;
-import aqua.blatt1.client.Aqualife;
 import aqua.blatt1.common.Direction;
-import aqua.blatt1.common.Properties;
+import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.NameResolutionRequest;
@@ -26,8 +32,13 @@ import aqua.blatt1.common.msgtypes.NameResolutionResponse;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
 import aqua.blatt1.common.msgtypes.NeighborUpdate;
 import aqua.blatt1.common.msgtypes.Token;
+
 import aqua.blatt2.PoisonPill;
 import aqua.blatt2.Poisoner;
+
+/******************************************************************************/
+/********************************* Class **************************************/
+/******************************************************************************/
 
 public class Broker {
   
@@ -36,13 +47,10 @@ public class Broker {
   // The list of clients uses InetSocketAddress as type for the key and String as type for the value.
   // InetSocketAddress is used as key because it is unique for each client and can be used to identify a client.
   ClientCollection<InetSocketAddress> cc_list;
-  private Timer leaseTimeCheck = new Timer();
   
-  // Initial lease time for a client in milliseconds
-  long init_lease_time = 10000;
+  long init_lease_time = 10000;                                                 // Initial client lease time in milliseconds
   
-  // Thread List
-  List<Thread> clientThreads = new LinkedList<Thread>();
+  List<Thread> clientThreads = new LinkedList<Thread>();                        // Thread List for the clients
   
   int curr_client_count = 0;
   
@@ -52,7 +60,7 @@ public class Broker {
 
   private static ExecutorService executor = Executors.newFixedThreadPool(thread_pool_size);
   
-  // Flag to stop the broker (needs to be volatile, see script "Nebenläufigkeit 3.1")
+  // Flag to stop the broker (needs to be volatile, see "Nebenläufigkeit 3.1")
   private static volatile boolean stopRequested = false;
 
   
@@ -141,14 +149,17 @@ public class Broker {
            * Also it is possible to send a new lease time to the client.
           */ 
           endpoint.send(currentMsg.getSender(), 
-                        new RegisterResponse(cc_list.getId(cc_list.indexOf(currentMsg.getSender())), init_lease_time));
+                        new RegisterResponse(cc_list.getId(cc_list.indexOf(currentMsg.getSender())), 
+                        init_lease_time));
                         
         } else {
           
           System.out.println("Registered new client with ID: tank" + curr_client_count);
           
           // Add client to the client list
-          cc_list.add("tank" + (curr_client_count), currentMsg.getSender(), System.currentTimeMillis());
+          cc_list.add("tank" + (curr_client_count), 
+                      currentMsg.getSender(), 
+                      System.currentTimeMillis());
           
           // Send the new client its neighbors
           InetSocketAddress left_neighbor = cc_list.getLeftNeighorOf(curr_client_count);
@@ -172,7 +183,7 @@ public class Broker {
     }
     
     /**
-     * Deregistera client
+     * Deregister client
      * @param currentMsg
      */
     private void deregister(Message currentMsg) {
@@ -318,7 +329,6 @@ public class Broker {
       
       // Handle the message in a separated BrokerTask thread
       executor.execute(new BrokerTask(message));
-      
       
     }
     
