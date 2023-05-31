@@ -1,9 +1,13 @@
+/**
+ * Poisoner.java
+ * This class is used to poison the server.
+ */
+
 package aqua.blatt2;
 
 import java.net.InetSocketAddress;
 
 import javax.swing.JOptionPane;
-import javax.swing.ImageIcon;
 
 import messaging.Endpoint;
 import aqua.blatt1.common.Properties;

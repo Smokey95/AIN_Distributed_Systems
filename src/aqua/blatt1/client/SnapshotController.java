@@ -1,6 +1,9 @@
+/**
+ * SnapshotController.java
+ * This class is used to initiate a snapshot.
+ */
 package aqua.blatt1.client;
 
-import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
@@ -25,6 +28,9 @@ public class SnapshotController implements ActionListener {
 				e1.printStackTrace();
 			}
 		}
-		JOptionPane.showMessageDialog(null, "Snapshotcount: " + this.tankmodel.globalSnapshotCounter, "Snapshot finished", JOptionPane.INFORMATION_MESSAGE);
+		JOptionPane.showMessageDialog(null, 
+																	"Snapshotcount: " + this.tankmodel.globalSnapshotCounter, 
+																	"Snapshot finished", 
+																	JOptionPane.INFORMATION_MESSAGE);
 	}
 }

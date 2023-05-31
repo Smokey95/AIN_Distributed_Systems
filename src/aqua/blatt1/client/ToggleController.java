@@ -1,9 +1,11 @@
+/**
+ * ToggleController.java
+ * This class is used to toggle the location of a fish between the two tanks.
+ */
 package aqua.blatt1.client;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-
-import javax.swing.JOptionPane;
 
 public class ToggleController implements ActionListener {
 	private final String fish_id;

@@ -1,10 +1,13 @@
+/**
+ * TankView.java
+ * View of the aquarium
+ */
 package aqua.blatt1.client;
 
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Stroke;
 import java.awt.BasicStroke;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;

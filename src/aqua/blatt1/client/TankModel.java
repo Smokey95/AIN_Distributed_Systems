@@ -1,3 +1,7 @@
+/**
+ * TankModel.java
+ * This class represents the tank model of the aquarium.
+ */
 package aqua.blatt1.client;
 
 import java.net.InetSocketAddress;
@@ -12,15 +16,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Map;
 
 import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
 import aqua.blatt1.common.msgtypes.RegisterResponse;
-import aqua.blatt1.common.msgtypes.SnapshotMarker;
-import aqua.blatt1.common.msgtypes.SnapshotToken;
-
 import aqua.blatt1.common.msgtypes.SnapshotToken;
 
 public class TankModel extends Observable implements Iterable<FishModel> {
