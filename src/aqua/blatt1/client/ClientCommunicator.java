@@ -20,14 +20,15 @@ import aqua.blatt1.common.msgtypes.NameResolutionRequest;
 import aqua.blatt1.common.msgtypes.NameResolutionResponse;
 import aqua.blatt1.common.msgtypes.LocationUpdate;
 import aqua.blatt1.common.msgtypes.LocationRequest;
+import aqua.blatt1.common.SecureEndpoint;
 import aqua.blatt2.PoisonPill;
 
 public class ClientCommunicator {
 	
-	private final Endpoint endpoint;
+	private final SecureEndpoint endpoint;
 	
 	public ClientCommunicator() {
-		endpoint = new Endpoint();
+		endpoint = new SecureEndpoint();
 	}
 
 	
