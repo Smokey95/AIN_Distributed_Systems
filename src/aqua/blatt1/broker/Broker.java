@@ -19,6 +19,7 @@ import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.client.Aqualife;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.Properties;
+import aqua.blatt1.common.SecureEndpoint;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
 import aqua.blatt1.common.msgtypes.HandoffRequest;
 import aqua.blatt1.common.msgtypes.NameResolutionRequest;
@@ -31,7 +32,7 @@ import aqua.blatt2.Poisoner;
 
 public class Broker {
   
-  Endpoint endpoint;
+  SecureEndpoint endpoint;
   
   // The list of clients uses InetSocketAddress as type for the key and String as type for the value.
   // InetSocketAddress is used as key because it is unique for each client and can be used to identify a client.
@@ -62,7 +63,8 @@ public class Broker {
    */
   public Broker() {
     this.lock = new ReentrantReadWriteLock();
-    this.endpoint = new Endpoint(4711);
+    //this.endpoint = new Endpoint(4711);
+    this.endpoint = new SecureEndpoint(4711);
     
     // Create a new ClientCollection to store the clients
     this.cc_list = new ClientCollection<>();
@@ -75,7 +77,8 @@ public class Broker {
    */
   public Broker(int port) {
     this.lock = new ReentrantReadWriteLock();
-    this.endpoint = new Endpoint(port);
+    //this.endpoint = new Endpoint(port);
+    this.endpoint = new SecureEndpoint(port);
     this.cc_list = new ClientCollection<>();
   }
   
