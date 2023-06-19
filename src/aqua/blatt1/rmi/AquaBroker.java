@@ -14,7 +14,7 @@ public interface AquaBroker extends Remote {
 
     public void deregister(TankModel client) throws RemoteException;
 
-    public void handOffFish(FishModel fish) throws RemoteException;
+    public void handOffFish(FishModel fish, AquaClient client) throws RemoteException;
     
     public void resolveName(String tankId, String requestId) throws RemoteException;
 }

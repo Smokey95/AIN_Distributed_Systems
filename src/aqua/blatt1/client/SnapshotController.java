@@ -16,14 +16,6 @@ public class SnapshotController implements ActionListener {
 	@Override
 	public void actionPerformed(ActionEvent e) {
 
-		//wait for snapshot to finish
-		while(tankmodel.snapshotInProgress) {
-			try {
-				Thread.sleep(10);
-			} catch (InterruptedException e1) {
-				e1.printStackTrace();
-			}
-		}
-		JOptionPane.showMessageDialog(null, "Snapshotcount: " + this.tankmodel.globalSnapshotCounter, "Snapshot finished", JOptionPane.INFORMATION_MESSAGE);
+		System.out.println("Global Snapshot requested.");
 	}
 }

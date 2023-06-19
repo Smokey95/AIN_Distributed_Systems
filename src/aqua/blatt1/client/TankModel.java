@@ -1,34 +1,17 @@
 package aqua.blatt1.client;
 
-import java.net.InetSocketAddress;
-import java.rmi.Naming;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Observable;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.Timer;
-import java.util.TimerTask;
-import java.util.Map;
-
-import aqua.blatt1.client.ClientCommunicator.ClientReceiver;
 import aqua.blatt1.common.Direction;
 import aqua.blatt1.common.FishModel;
-import aqua.blatt1.common.Properties;
-import aqua.blatt1.common.msgtypes.RegisterResponse;
-import aqua.blatt1.common.msgtypes.SnapshotMarker;
-import aqua.blatt1.common.msgtypes.SnapshotToken;
-
-import aqua.blatt1.common.msgtypes.SnapshotToken;
-
 import aqua.blatt1.rmi.AquaBroker;
 import aqua.blatt1.rmi.AquaClient;
 
@@ -43,60 +26,15 @@ public class TankModel extends Observable implements Iterable<FishModel>, AquaCl
 	protected final Set<FishModel> fishies;																									//! Set of fish in the tank
 	protected int fishCounter = 0;
 	protected int fadingFishCounter = 0;
-
-	//protected final ClientCommunicator.ClientForwarder forwarder;
-	protected InetSocketAddress left_neighbor = null;
-	protected InetSocketAddress right_neighbor = null;
-	protected InetSocketAddress homeAgentUpdate = null;
-	
 	protected boolean token = false;
 	protected Timer timer = new Timer();
 
 	protected Timer leaseTimer = new Timer();
-
-	protected SnapshotState snapshotState = SnapshotState.IDLE;
-	protected boolean isInitializer = false;
-	protected int localSnapshotCounter = 0;
-	public int globalSnapshotCounter = 0;
-	
-	protected boolean snapshotInProgress = false;
-	
+		
 	protected AquaBroker broker;
 	public AquaClient client;
-
-	enum SnapshotState {
-		IDLE,
-		LEFT,
-		RIGHT,
-		BOTH
-	}
-	
-	/*
-	protected final Map<String, FishState> fishiesMasterList;
-
-	enum FishState {
-		HERE,
-		LEFT,
-		RIGHT
-	}
-	*/
 	
 	public TankModel(AquaBroker broker) throws RemoteException {
-
-		//try{
-		//	// start the client rmi
-		//	Registry registry = LocateRegistry.createRegistry(new Random().nextInt(10000) + 50000);
-		//	
-		//	// create the client
-		//	AquaClient strup = (AquaClient) UnicastRemoteObject.exportObject(this, 0);
-		//	
-		//	// bind the client to the registry
-		//	registry.rebind("AquaClient", strup);
-		//	
-		//	System.out.println("Client started");
-		//} catch (Exception e) {
-		//	e.printStackTrace();
-		//}
 
 		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
 		
@@ -104,7 +42,6 @@ public class TankModel extends Observable implements Iterable<FishModel>, AquaCl
 		
 		this.client = (AquaClient) UnicastRemoteObject.exportObject(this, 0);
 	}
-
 
 	/**
 	 * Adds a fish to the tank at the specified position.
@@ -130,23 +67,6 @@ public class TankModel extends Observable implements Iterable<FishModel>, AquaCl
 	 */
 	@Override
 	public void receiveFish(FishModel fish) throws RemoteException {
-		
-		System.out.println("Received fish " + fish.getId());
-		
-		// Check if there is a snapshot in progress
-		if(snapshotState.equals(SnapshotState.LEFT)) {
-			if (fish.getDirection().equals(Direction.LEFT)) {
-				localSnapshotCounter++;
-			}
-		} else if(snapshotState.equals(SnapshotState.RIGHT)) {
-			if (fish.getDirection().equals(Direction.RIGHT)) {
-				localSnapshotCounter++;
-			}
-		} else if(snapshotState.equals(SnapshotState.BOTH) 
-		|| snapshotState.equals(SnapshotState.IDLE)) {
-			localSnapshotCounter++;
-		}
-		
 		fish.setToStart();
 		fishies.add(fish);
 	}
@@ -179,7 +99,7 @@ public class TankModel extends Observable implements Iterable<FishModel>, AquaCl
 				//	fishiesMasterList.put(fish.getId(), FishState.RIGHT);
 				//}
 				try{
-					broker.handOffFish(fish);
+					broker.handOffFish(fish, this);
 				} catch (RemoteException e) {
 					e.printStackTrace();
 				}
@@ -202,11 +122,6 @@ public class TankModel extends Observable implements Iterable<FishModel>, AquaCl
 		notifyObservers();
 	}
 
-
-	/**
-	 * Runs the tank model. This method is called by the client receiver thread.
-	 * @param cr the client receiver to check for termination
-	 */
 	protected void run() {
 		// Register with the AquaBroker
 		try {
