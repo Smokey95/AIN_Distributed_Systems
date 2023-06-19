@@ -54,11 +54,6 @@ public class TankView extends JPanel implements Observer {
 
 	private void doDrawing(Graphics g) {
 		Graphics2D g2d = (Graphics2D) g;
-		
-		if(!tankModel.hasToken()) {
-			g2d.setColor(Color.RED);
-			drawBorders(g2d);
-		}
 
 		for (FishModel fishModel : tankModel) {
 			g2d.drawImage(fishView.getImage(fishModel), fishModel.getX(), fishModel.getY(), null);

@@ -38,7 +38,7 @@ public class AquaGui extends JFrame implements Runnable, Observer {
 
 		addWindowListener(new WindowAdapter() {
 			public void windowClosed(WindowEvent e) {
-				tankModel.finish();
+				//tankModel.finish();
 				System.exit(0);
 			}
 		});

@@ -4,6 +4,7 @@ import messaging.Endpoint;
 import messaging.Message;
 
 import java.net.InetSocketAddress;
+import java.rmi.RemoteException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -17,7 +18,9 @@ import javax.swing.*;
 
 import aqua.blatt1.common.msgtypes.RegisterRequest;
 import aqua.blatt1.client.Aqualife;
+import aqua.blatt1.client.TankModel;
 import aqua.blatt1.common.Direction;
+import aqua.blatt1.common.FishModel;
 import aqua.blatt1.common.Properties;
 import aqua.blatt1.common.SecureEndpoint;
 import aqua.blatt1.common.msgtypes.DeregisterRequest;
@@ -30,13 +33,23 @@ import aqua.blatt1.common.msgtypes.Token;
 import aqua.blatt2.PoisonPill;
 import aqua.blatt2.Poisoner;
 
-public class Broker {
+import aqua.blatt1.rmi.AquaBroker;
+import aqua.blatt1.rmi.AquaClient;
+import java.rmi.Naming;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
+
+public class Broker implements AquaBroker{
   
   SecureEndpoint endpoint;
   
   // The list of clients uses InetSocketAddress as type for the key and String as type for the value.
   // InetSocketAddress is used as key because it is unique for each client and can be used to identify a client.
   ClientCollection<InetSocketAddress> cc_list;
+
+  List<AquaClient> client_list;
+
   private Timer leaseTimeCheck = new Timer();
   
   // Initial lease time for a client in milliseconds
@@ -68,6 +81,8 @@ public class Broker {
     
     // Create a new ClientCollection to store the clients
     this.cc_list = new ClientCollection<>();
+
+    this.client_list = new LinkedList<>();
   }
   
   
@@ -331,7 +346,69 @@ public class Broker {
   }
   
   public static void main(String[] args) {
-    Broker broker = new Broker();
-    broker.broker();
+    // Broker broker = new Broker();
+    // broker.broker();
+
+    try {
+      
+      //System.setProperty("java.rmi.server.hostname", "localhost");
+      
+      Registry registry = LocateRegistry.createRegistry(Registry.REGISTRY_PORT);
+      
+      // Create a new Broker object
+      AquaBroker stub = (AquaBroker) UnicastRemoteObject.exportObject(new Broker(), 0);
+      
+      // Bind the remote object's stub in the registry
+      registry.rebind(Properties.BROKER_NAME, stub);
+      
+      System.out.println("AquaBrokerServer wurde gestartet." + stub.toString());
+      
+      //print more information
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    
+    while(true) {
+      // Wait for the shutdown pane to send a PoisonPill
+      
+      // check if new client has connecte
+    }
+  }
+
+
+  @Override
+  public void register(AquaClient client) throws RemoteException {
+    
+    System.out.println("Client register request received");
+    
+    client_list.add(client);
+    System.out.println("Client count: " + cc_list.size());
+    curr_client_count++;
+  }
+
+
+  @Override
+  public void deregister(TankModel client) throws RemoteException {
+    // TODO Auto-generated method stub
+    client_list.remove(client);
+    curr_client_count--;
+  }
+
+
+  @Override
+  public void handOffFish(FishModel fish) throws RemoteException {
+    System.out.println("Handoff request received");
+    if(fish.getDirection() == Direction.LEFT) {
+      client_list.get(0).receiveFish(fish);
+    } else {
+      client_list.get(0).receiveFish(fish);
+    }
+  }
+
+
+  @Override
+  public void resolveName(String tankId, String requestId) throws RemoteException {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'resolveName'");
   }
 }

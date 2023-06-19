@@ -15,7 +15,6 @@ public class SnapshotController implements ActionListener {
 
 	@Override
 	public void actionPerformed(ActionEvent e) {
-		tankmodel.initiateSnapshot();
 
 		//wait for snapshot to finish
 		while(tankmodel.snapshotInProgress) {
